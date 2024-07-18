@@ -7,9 +7,12 @@ use sysinfo::System;
 #[tokio::main]
 async fn main() {
     // build our application with a route
-    let app = Router::new().route("/", get(root)).with_state(AppState {
-        sys: Arc::new(Mutex::new(System::new())),
-    });
+    let app = Router::new()
+        .route("/", get(root))
+        .route("/api/cpus", get(get_cpus))
+        .with_state(AppState {
+            sys: Arc::new(Mutex::new(System::new())),
+        });
 
     // run our app with hyper, listening globally on port 8080
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
@@ -26,7 +29,11 @@ struct AppState {
     sys: Arc<Mutex<System>>,
 }
 
-async fn root(State(state): State<AppState>) -> String {
+async fn root() -> &'static str {
+    "hehe"
+}
+
+async fn get_cpus(State(state): State<AppState>) -> String {
     assert_eq!(sysinfo::IS_SUPPORTED_SYSTEM, true);
     let mut res = String::new();
 
