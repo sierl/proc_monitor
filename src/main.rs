@@ -12,6 +12,8 @@ async fn main() {
     // build our application with a route
     let app = Router::new()
         .route("/", get(root))
+        .route("/script.js", get(get_script_js))
+        .route("/style.css", get(get_style_css))
         .route("/api/cpus", get(get_cpus))
         .with_state(AppState {
             sys: Arc::new(Mutex::new(System::new())),
@@ -34,8 +36,19 @@ struct AppState {
 
 #[axum::debug_handler]
 async fn root() -> impl IntoResponse {
-    let content = tokio::fs::read_to_string("src/index.html").await.unwrap();
+    let content = tokio::fs::read_to_string("view/index.html").await.unwrap();
+    Html(content)
+}
 
+#[axum::debug_handler]
+async fn get_style_css() -> impl IntoResponse {
+    let content = tokio::fs::read_to_string("view/style.css").await.unwrap();
+    Html(content)
+}
+
+#[axum::debug_handler]
+async fn get_script_js() -> impl IntoResponse {
+    let content = tokio::fs::read_to_string("view/script.js").await.unwrap();
     Html(content)
 }
 
