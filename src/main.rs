@@ -6,11 +6,14 @@ use axum::{
     Json, Router,
 };
 use std::sync::{Arc, Mutex};
+use std::thread;
 use sysinfo::System;
 
 #[tokio::main]
 async fn main() {
     assert_eq!(sysinfo::IS_SUPPORTED_SYSTEM, true);
+
+    let app_state = AppState::default();
 
     // build our application with a route
     let app = Router::new()
@@ -18,9 +21,24 @@ async fn main() {
         .route("/script.js", get(get_script_js))
         .route("/style.css", get(get_style_css))
         .route("/api/cpus", get(get_cpus))
-        .with_state(AppState {
-            sys: Arc::new(Mutex::new(System::new())),
-        });
+        .with_state(app_state.clone());
+
+    // Compute CPU usage in background
+    thread::spawn(move || {
+        let mut sys = System::new();
+
+        loop {
+            sys.refresh_cpu();
+            let v = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
+
+            {
+                let mut cpus = app_state.cpus.lock().unwrap();
+                *cpus = v;
+            }
+
+            thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+        }
+    });
 
     // run our app with hyper, listening globally on port 8080
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080")
@@ -32,9 +50,9 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 struct AppState {
-    sys: Arc<Mutex<System>>,
+    cpus: Arc<Mutex<Vec<f32>>>,
 }
 
 #[axum::debug_handler]
@@ -65,10 +83,7 @@ async fn get_script_js() -> impl IntoResponse {
 
 #[axum::debug_handler]
 async fn get_cpus(State(state): State<AppState>) -> impl IntoResponse {
-    let mut sys = state.sys.lock().unwrap();
-    sys.refresh_cpu();
-
-    let res: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
+    let res = state.cpus.lock().unwrap().clone();
 
     Json(res)
 }
