@@ -46,7 +46,6 @@ url.protocol = url.protocol.replace('http', 'ws');
 let ws = new WebSocket(url.href);
 ws.onmessage = (event) => {
     let cpuUsages = JSON.parse(event.data);
-    // console.log(cpuUsages);
 
     if (notDrawnOnce) {
         displayJsonCreate(cpuUsages);

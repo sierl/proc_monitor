@@ -6,27 +6,25 @@ use axum::{
     http::Response,
     response::{Html, IntoResponse},
     routing::get,
-    Json, Router,
+    Router,
 };
 use std::thread;
-use std::{
-    sync::{Arc, Mutex},
-    time::Duration,
-};
 use sysinfo::System;
+use tokio::sync::broadcast;
 
 #[tokio::main]
 async fn main() {
     assert_eq!(sysinfo::IS_SUPPORTED_SYSTEM, true);
 
-    let app_state = AppState::default();
+    let (tx, _) = broadcast::channel(1);
+
+    let app_state = AppState { tx: tx.clone() };
 
     // build our application with a route
     let app = Router::new()
         .route("/", get(root))
         .route("/script.js", get(get_script_js))
         .route("/style.css", get(get_style_css))
-        .route("/api/cpus", get(get_cpus))
         .route("/realtime/cpus", get(get_realtime_cpu))
         .with_state(app_state.clone());
 
@@ -36,12 +34,9 @@ async fn main() {
 
         loop {
             sys.refresh_cpu();
-            let v = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
 
-            {
-                let mut cpus = app_state.cpus.lock().unwrap();
-                *cpus = v;
-            }
+            let v = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
+            let _ = tx.send(v);
 
             thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
         }
@@ -57,9 +52,9 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 struct AppState {
-    cpus: Arc<Mutex<Vec<f32>>>,
+    tx: broadcast::Sender<Vec<f32>>,
 }
 
 #[axum::debug_handler]
@@ -89,13 +84,6 @@ async fn get_script_js() -> impl IntoResponse {
 }
 
 #[axum::debug_handler]
-async fn get_cpus(State(state): State<AppState>) -> impl IntoResponse {
-    let res = state.cpus.lock().unwrap().clone();
-
-    Json(res)
-}
-
-#[axum::debug_handler]
 async fn get_realtime_cpu(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
@@ -104,11 +92,10 @@ async fn get_realtime_cpu(
 }
 
 async fn realtime_cpu_stream(mut ws: WebSocket, state: AppState) {
-    loop {
-        let payload =
-            serde_json::to_string::<Vec<f32>>(state.cpus.lock().unwrap().as_ref()).unwrap();
-        ws.send(Message::Text(payload)).await.unwrap();
+    let mut rx = state.tx.subscribe();
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+    while let Ok(msg) = rx.recv().await {
+        let payload = serde_json::to_string(&msg).unwrap();
+        ws.send(Message::Text(payload)).await.unwrap();
     }
 }
