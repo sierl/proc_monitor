@@ -1,11 +1,14 @@
 use axum::extract::State;
+use axum::response::IntoResponse;
+use axum::Json;
 use axum::{routing::get, Router};
-use std::fmt::Write;
 use std::sync::{Arc, Mutex};
 use sysinfo::System;
 
 #[tokio::main]
 async fn main() {
+    assert_eq!(sysinfo::IS_SUPPORTED_SYSTEM, true);
+
     // build our application with a route
     let app = Router::new()
         .route("/", get(root))
@@ -33,16 +36,12 @@ async fn root() -> &'static str {
     "hehe"
 }
 
-async fn get_cpus(State(state): State<AppState>) -> String {
-    assert_eq!(sysinfo::IS_SUPPORTED_SYSTEM, true);
-    let mut res = String::new();
-
+#[axum::debug_handler]
+async fn get_cpus(State(state): State<AppState>) -> impl IntoResponse {
     let mut sys = state.sys.lock().unwrap();
     sys.refresh_cpu();
 
-    for (i, cpu) in sys.cpus().iter().enumerate() {
-        writeln!(&mut res, "CPU {}: {}%", i + 1, cpu.cpu_usage()).unwrap();
-    }
+    let res: Vec<_> = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).collect();
 
-    res
+    Json(res)
 }
