@@ -38,17 +38,20 @@ const displayJsonUpdate = (cpuUsageAsJson) => {
     }
 }
 
-const update = async (displayFn) => {
-    let response = await fetch('/api/cpus');
-    if (response.status != 200) {
-        throw new Error(`HTTP Error: status ${response.status}`);
+let notDrawnOnce = true;
+
+let url = new URL('/realtime/cpus', window.location.href);
+url.protocol = url.protocol.replace('http', 'ws');
+
+let ws = new WebSocket(url.href);
+ws.onmessage = (event) => {
+    let cpuUsages = JSON.parse(event.data);
+    // console.log(cpuUsages);
+
+    if (notDrawnOnce) {
+        displayJsonCreate(cpuUsages);
+        notDrawnOnce = false;
+    } else {
+        displayJsonUpdate(cpuUsages);
     }
-
-    let json = await response.json();
-    console.log(json);
-
-    displayFn(json);
-};
-
-setInterval(update, 200, displayJsonUpdate);
-update(displayJsonCreate);
+}

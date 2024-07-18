@@ -1,12 +1,18 @@
 use axum::{
-    extract::State,
+    extract::{
+        ws::{Message, WebSocket, WebSocketUpgrade},
+        State,
+    },
     http::Response,
     response::{Html, IntoResponse},
     routing::get,
     Json, Router,
 };
-use std::sync::{Arc, Mutex};
 use std::thread;
+use std::{
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use sysinfo::System;
 
 #[tokio::main]
@@ -21,6 +27,7 @@ async fn main() {
         .route("/script.js", get(get_script_js))
         .route("/style.css", get(get_style_css))
         .route("/api/cpus", get(get_cpus))
+        .route("/realtime/cpus", get(get_realtime_cpu))
         .with_state(app_state.clone());
 
     // Compute CPU usage in background
@@ -86,4 +93,22 @@ async fn get_cpus(State(state): State<AppState>) -> impl IntoResponse {
     let res = state.cpus.lock().unwrap().clone();
 
     Json(res)
+}
+
+#[axum::debug_handler]
+async fn get_realtime_cpu(
+    ws: WebSocketUpgrade,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|ws: WebSocket| async { realtime_cpu_stream(ws, state).await })
+}
+
+async fn realtime_cpu_stream(mut ws: WebSocket, state: AppState) {
+    loop {
+        let payload =
+            serde_json::to_string::<Vec<f32>>(state.cpus.lock().unwrap().as_ref()).unwrap();
+        ws.send(Message::Text(payload)).await.unwrap();
+
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
 }

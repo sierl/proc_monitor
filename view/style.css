@@ -1,10 +1,13 @@
 body {
-    background-color: #edf6e9;
+    /* background-color: #edf6e9; */
+    background-color: #111111;
     font-family: sans-serif;
+    color: #ccc;
 }
 
 .bar-container {
-    background-color: #ffddd2;
+    /* background-color: #ffddd2; */
+    background-color: #424B54;
     font-size: 1.3rem;
     width: 60%;
     height: 2rem;
@@ -18,7 +21,8 @@ body {
 
 .bar {
     z-index: 5;
-    background-color: #ff9b71;
+    /* background-color: #ff9b71; */
+    background-color: #93A8AC;
     height: 100%;
     position: absolute;
     left: 0;
