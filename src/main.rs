@@ -1,7 +1,10 @@
-use axum::extract::State;
-use axum::response::{Html, IntoResponse};
-use axum::Json;
-use axum::{routing::get, Router};
+use axum::{
+    extract::State,
+    http::Response,
+    response::{Html, IntoResponse},
+    routing::get,
+    Json, Router,
+};
 use std::sync::{Arc, Mutex};
 use sysinfo::System;
 
@@ -43,13 +46,21 @@ async fn root() -> impl IntoResponse {
 #[axum::debug_handler]
 async fn get_style_css() -> impl IntoResponse {
     let content = tokio::fs::read_to_string("view/style.css").await.unwrap();
-    Html(content)
+
+    Response::builder()
+        .header("content-type", "text/css;charset=utf-8")
+        .body(content)
+        .unwrap()
 }
 
 #[axum::debug_handler]
 async fn get_script_js() -> impl IntoResponse {
     let content = tokio::fs::read_to_string("view/script.js").await.unwrap();
-    Html(content)
+
+    Response::builder()
+        .header("content-type", "application/javascript;charset=utf-8")
+        .body(content)
+        .unwrap()
 }
 
 #[axum::debug_handler]
