@@ -1,5 +1,5 @@
 use axum::extract::State;
-use axum::response::IntoResponse;
+use axum::response::{Html, IntoResponse};
 use axum::Json;
 use axum::{routing::get, Router};
 use std::sync::{Arc, Mutex};
@@ -32,8 +32,11 @@ struct AppState {
     sys: Arc<Mutex<System>>,
 }
 
-async fn root() -> &'static str {
-    "hehe"
+#[axum::debug_handler]
+async fn root() -> impl IntoResponse {
+    let content = tokio::fs::read_to_string("src/index.html").await.unwrap();
+
+    Html(content)
 }
 
 #[axum::debug_handler]
